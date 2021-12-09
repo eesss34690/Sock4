@@ -1,0 +1,16 @@
+*.txt
+client
+bin/
+.git
+cmds/
+*.o
+__MACOSX
+.vscode
+sample_console.cgi
+printenv.cgi
+.nfs*
+np_single_golden
+panel.cgi
+test.html
+http_server.cpp
+panel_socks.cgi
