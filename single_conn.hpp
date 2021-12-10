@@ -11,7 +11,7 @@ using boost::asio::ip::tcp;
 struct sock4{
     unsigned char VN;
     unsigned char CD;
-    unsigned char D_PORT;
+    string D_PORT;
     unsigned char D_PORT_CHAR[2];
     string D_IP;
     unsigned char D_IP_CHAR[4];
@@ -22,7 +22,7 @@ class single_conn
 private:
     tcp::socket socket_;
     enum { max_length = 15000 };
-    array<char, max_length> data_;
+    array<unsigned char, max_length> data_;
     sock4 header;
     bool fourA;
     boost::asio::io_context& io_context_;
