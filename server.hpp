@@ -16,17 +16,17 @@ using boost::asio::ip::tcp;
 class server
 {
 public:
-    server(boost::asio::io_context& io_context, short port)
+    server(short port)
         : acceptor_(io_context, tcp::endpoint(tcp::v4(), port)),
-          signal_(io_context, SIGCHLD)
+        sock_(io_context)
     {
-        do_accept(io_context);
+        do_accept();
     }
 
 private:
-    void do_accept(boost::asio::io_context& io_context);
+    void do_accept();
 
-    boost::asio::ip::tcp::acceptor acceptor_;
-    boost::asio::signal_set signal_;  
+    tcp::acceptor acceptor_;
+    tcp::socket sock_;
 };
 #endif

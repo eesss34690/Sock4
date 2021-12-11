@@ -1,5 +1,5 @@
 *.txt
-client
+socks_server
 bin/
 .git
 cmds/
@@ -10,5 +10,4 @@ __MACOSX
 np_single_golden
 panel.cgi
 test.html
-http_server.cpp
 panel_socks.cgi
