@@ -38,15 +38,13 @@ void conn::start(int mode)
 void conn::sock_reply(bool granted)
 {
     auto self(shared_from_this());
-    string msg;
-    msg += '\0';
-    msg += (granted ? 0x5A : 0x5B);
-    msg += header.D_PORT_CHAR[0];
-    msg += header.D_PORT_CHAR[1];
-    msg += header.D_IP_CHAR[0];
-    msg += header.D_IP_CHAR[1];
-    msg += header.D_IP_CHAR[2];
-    msg += header.D_IP_CHAR[3];
+    array<unsigned char, 8> msg;
+    auto data = msg.data();
+    data[0] = '\0';
+    data[1] = (granted ? 0x5A : 0x5B);
+    memcpy(&data[2], (unsigned char*)&(header.D_PORT_CHAR), 2);
+    memcpy(&data[4], (unsigned char*)&(header.D_IP_CHAR), 4);
+    for (auto &j: msg) cout << j - '\0' << " ";
     cli_sock->async_send(boost::asio::buffer(msg), [](boost::system::error_code ec, size_t _){});
 }
 
@@ -92,20 +90,24 @@ void conn::do_accept()
 {
     auto self(shared_from_this());
     tcp::acceptor acceptor_(io_context, tcp::endpoint(tcp::v4(), 0));
-    acceptor_.listen();
     unsigned int port_ = acceptor_.local_endpoint().port();
     header.D_PORT = port_;
     header.D_PORT_CHAR[0] = port_/ 256;
     header.D_PORT_CHAR[1] = port_% 256;
     for(int i=0; i<4; i++)
-        header.D_IP_CHAR[i] = 0;
+        header.D_IP_CHAR[i] = '\0';
     sock_reply(true);
-    acceptor_.async_accept(ser_sock, [this, self](const boost::system::error_code &ec){
-        if(!ec){
-            sock_reply(true);
-            sock_commute(1, 1);
-        }
-    });
+    acceptor_.accept(ser_sock);
+    sock_reply(true);
+    sock_commute(1,1);
+    //acceptor_.async_accept(ser_sock, [this, self](const boost::system::error_code &ec){
+    //    if(!ec){
+    //        cout << "accept\n";
+    //        auto ep = ser_sock.remote_endpoint();
+    //        sock_reply(true);
+    //        sock_commute(1, 1);
+    //    }
+    //});
 }
 
 bool single_conn::firewall()

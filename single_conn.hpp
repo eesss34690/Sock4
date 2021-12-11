@@ -19,18 +19,6 @@ struct sock4{
     unsigned char D_IP_CHAR[4];
 };
 
-struct SocksReq{
-    int VN;
-    int CD;
-    int S_PORT;
-    string S_IP;
-    int D_PORT;
-    char DSTPORT[2];
-    string D_IP;
-    char DSTIP[4];
-    string DOMAIN_NAME;
-};
-
 class single_conn
  : public enable_shared_from_this<single_conn> {
 private:
@@ -56,17 +44,15 @@ private:
     shared_ptr<tcp::socket> cli_sock;
     tcp::socket ser_sock;
     sock4 header;
-    //SocksReq header;
     enum { max_length = 15000 };
     array<unsigned char, max_length> data_;
 
     void sock_reply(bool granted);
-    void sock_redirect(bool enableser_socket, bool enablecli_socket);
+    void sock_commute(bool server, bool client);
     void do_connect();
     void do_accept();
 public:
     conn(tcp::socket sock, sock4 req):
-    //conn(tcp::socket sock, SocksReq req):
         cli_sock(make_shared<tcp::socket>(move(sock))),
         ser_sock(io_context),
         header(req){};
