@@ -48,27 +48,27 @@ void conn::sock_reply(bool granted)
     cli_sock->async_send(boost::asio::buffer(msg), [](boost::system::error_code ec, size_t _){});
 }
 
-void conn::sock_commute(bool server, bool client)
+void conn::sock_commute(bool ser_cli)
 {
     auto self(shared_from_this());
-    if(server){
-        ser_sock.async_read_some(boost::asio::buffer(data_, data_.size()), [this, self](boost::system::error_code ec, size_t length){
+    if(ser_cli){
+        ser_sock.async_read_some(boost::asio::buffer(data_.data(), data_.size()/ 2), [this, self](boost::system::error_code ec, size_t length){
             if(!ec){
-                cli_sock->async_send(boost::asio::buffer(data_, length), [](boost::system::error_code ec, size_t _){});
+                cli_sock->async_send(boost::asio::buffer(data_.data(), length), [](boost::system::error_code ec, size_t _){});
                 data_.fill('\0');
-                sock_commute(1, 0);
+                sock_commute(1);
             }
             if(ec == boost::asio::error::eof){
                 cli_sock->close();
             }
         });
     }
-    if(client){
-        cli_sock->async_read_some(boost::asio::buffer(data_, data_.size()), [this, self](boost::system::error_code ec, size_t length) {
+    else{
+        cli_sock->async_read_some(boost::asio::buffer(data_.data()+ data_.size()/ 2 + 1, data_.size()- data_.size()/ 2), [this, self](boost::system::error_code ec, size_t length) {
             if(!ec){
-                ser_sock.async_send(boost::asio::buffer(data_, length), [](boost::system::error_code ec, size_t _){});
+                ser_sock.async_send(boost::asio::buffer(data_.data()+ data_.size()/ 2 + 1, length), [](boost::system::error_code ec, size_t _){});
                 data_.fill('\0');
-                sock_commute(0, 1);
+                sock_commute(0);
             }   
         });
     }
@@ -81,7 +81,8 @@ void conn::do_connect()
     ser_sock.async_connect(ep, [this, self](const boost::system::error_code &ec){
         if(!ec){
             sock_reply(true);
-            sock_commute(1, 1);
+            sock_commute(1);
+            sock_commute(0);
         }
     });
 }
@@ -99,7 +100,8 @@ void conn::do_accept()
     sock_reply(true);
     acceptor_.accept(ser_sock);
     sock_reply(true);
-    sock_commute(1,1);
+    sock_commute(1);
+    sock_commute(0);
     //acceptor_.async_accept(ser_sock, [this, self](const boost::system::error_code &ec){
     //    if(!ec){
     //        cout << "accept\n";

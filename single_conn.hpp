@@ -48,7 +48,7 @@ private:
     array<unsigned char, max_length> data_;
 
     void sock_reply(bool granted);
-    void sock_commute(bool server, bool client);
+    void sock_commute(bool ser_cli);
     void do_connect();
     void do_accept();
 public:

@@ -2,7 +2,6 @@
 #define _CLIENT_HPP
 #include <boost/asio.hpp>
 #include <boost/array.hpp>
-#include <boost/thread/mutex.hpp>
 #include <memory>
 #include <string>
 #include <vector>
@@ -18,6 +17,8 @@ private:
     string host_;
     string port_;
     string file_;
+    string proxy_h;
+    string proxy_p;
     string session;
     client_set& cs_;
 
@@ -33,8 +34,9 @@ private:
 
     void do_read();
     void do_write();
+    void sock_conn();
 public:
-    client(boost::asio::io_context& io_context, client_set& cs, string s, string h, string p, string f);
+    client(boost::asio::io_context& io_context, client_set& cs, string s, string h, string p, string f, string sh, string sp);
     void start();
     void stop(){boost::asio::post(io_context_, [this]() { socket.close(); });}
 };

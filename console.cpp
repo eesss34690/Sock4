@@ -16,6 +16,7 @@
 #include "client_set.hpp"
 #include "output_func.hpp"
 
+using boost::asio::ip::tcp;
 using namespace std;
 void client_set::start(std::shared_ptr<client> c)
 {
@@ -33,9 +34,9 @@ void client_set::stop_all(){
     }
     connections_.clear();
 }
-client::client(boost::asio::io_context& io_context, client_set& cs, string s, string h, string p, string f)
+client::client(boost::asio::io_context& io_context, client_set& cs, string s, string h, string p, string f, string sh, string sp)
     : host_(h), port_(p), file_(f), session(s), idx(0), cs_(cs), socket(io_context)\
-    , resolver(io_context), io_context_(io_context){}
+    , resolver(io_context), io_context_(io_context), proxy_h(sh), proxy_p(sp){}
 
 void client::start()
 {
@@ -45,23 +46,26 @@ void client::start()
         boost::filesystem::ifstream f(path);
         string line;
         while (getline(f, line))
-	{
-	    if (line.empty() || line == "\r") {
-                break; // end of headers reached
-            }
-            if (line.back() == '\r') {
-                line.resize(line.size()-1);
-            }
-            cmd_list.push_back(line + "\n");
-	}
+        {
+            if (line.empty() || line == "\r") {
+                    break; // end of headers reached
+                }
+                if (line.back() == '\r') {
+                    line.resize(line.size()-1);
+                }
+                cmd_list.push_back(line + "\n");
+        }
         f.close();
-        boost::asio::ip::tcp::resolver::query query(host_, port_);
+        tcp::resolver::query query(proxy_h, proxy_p);
         resolver.async_resolve(query, [this](const boost::system::error_code& ec,
-            boost::asio::ip::tcp::resolver::iterator it) {
+            tcp::resolver::iterator it) {
             if (!ec)
                 socket.async_connect(it->endpoint(), [this](const boost::system::error_code& ec) {
                     if (!ec)
-                                do_read();
+                    {
+                        sock_conn();
+                        do_read();
+                    }
                     else
                         output_shell(session, ec.message().c_str());
                 });
@@ -69,6 +73,30 @@ void client::start()
                 output_shell(session, ec.message().c_str());
         });
     }
+}
+
+void client::sock_conn()
+{
+    auto self(shared_from_this());
+    string msg;
+    msg += 0x04;
+    msg += 0x01;
+    int port = stoi(port_);
+    boost::asio::ip::tcp::resolver::query q(host_, port_);
+    msg += port/256;
+    msg += port%256;
+    resolver.async_resolve(q, [this, self, &msg](const boost::system::error_code &ec, tcp::resolver::iterator it)mutable{
+        tcp::endpoint ep = *it;
+        string ips = ep.address().to_string();
+        int pos = 0, pos2 = 0;
+        for(int i=4; i<8; i++){
+            int pos2 = ips.find(".");
+            msg += stoi(ips.substr(pos, pos2));
+            pos = pos2 + 1;
+        }
+        msg += '\0';
+        socket.async_send(boost::asio::buffer(msg), [](boost::system::error_code ec, size_t _){});
+    });
 }
 
 void client::do_read()
@@ -87,13 +115,6 @@ void client::do_read()
                     do_read();
                 
             }
-	        //else
-	        //{
-                //output_shell(session, ec.message());
-			    //cs_.stop_all();
-		        //socket.close();
-			    //output_shell(session, to_string(self.use_count()));
-	        //}
         });
 }
 
@@ -127,7 +148,7 @@ void cgi_parser::parser()
     int start = 0;
     int end = env.find('&');
     int mid;
-    while (end != -1) {
+    while (env[start] != 's') {
         mid = env.find('=', start);
         if (end - mid == 1)
         {
@@ -139,8 +160,12 @@ void cgi_parser::parser()
         end = env.find('&', start);
     }
     mid = env.find('=', start);
-    if (env.length() - mid != 1)
-        query_big[env.substr(start, mid - start)] = env.substr(mid + 1, env.length() - mid - 1);
+    query_big[env.substr(start, mid - start)] = env.substr(mid + 1, end - mid - 1);
+    start = end + 1;
+    end = env.find('&', start);
+    
+    mid = env.find('=', start);
+    query_big[env.substr(start, mid - start)] = env.substr(mid + 1, end - mid - 1);
 }
 
 int main ()
@@ -194,36 +219,29 @@ int main ()
         temp[0] = 'p';
         cout << query_parse.get_attri(temp) << "</th>\r\n";
     }
-    //cout << "      <th scope=\"col\">nplinux1.cs.nctu.edu.tw:1234</th>\r\n";
     cout << "    </tr>\r\n";
     cout << "  </thead>\r\n";
     cout << "  <tbody>\r\n";
     cout << "    <tr>\r\n";
     for (int i = 0; i< query_parse.get_num(); i++)
     {
-        cout << "      <td><div class=\"scrollable\"><pre class=\"pre-scrollable\" id=\"";
+        cout << "      <td><div><pre id=\"";
         string temp = "s" + to_string(i);
         cout << temp << "\" class=\"mb-0\"></pre></div></td>\r\n";
     }
-    //cout << "      <td><pre id=\"s0\" class=\"mb-0\"></pre></td>\r\n";
     cout << "    </tr>\r\n";
     cout << "  </tbody>\r\n";
     cout << "</table>\r\n";
     cout << "</body>\r\n";
     cout << "</html>\r\n";
 
-    //output_shell("s0", "test");    
-    //output_shell("s0", "testtest"); 
-
     boost::asio::io_context io_context_;
     client_set cs;
-    //set<shared_ptr<client> > clients;
     for (int i = 0; i < query_parse.get_num(); i++) {
         auto ptr = make_shared<client>(io_context_, cs,"s" + to_string(i), query_parse.get_attri("h" + to_string(i)),\
-		 query_parse.get_attri("p" + to_string(i)), query_parse.get_attri("f" + to_string(i)));
+		 query_parse.get_attri("p" + to_string(i)), query_parse.get_attri("f" + to_string(i)), query_parse.get_attri("sh"),\
+         query_parse.get_attri("sp"));
         cs.start(ptr);
-        //clients.insert(ptr);
-        //ptr->start();
     }
     io_context_.run();
 
