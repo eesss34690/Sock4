@@ -19,7 +19,6 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fstream>
-#define MAXLEN 40000
 
 using boost::asio::ip::tcp;
 using namespace std;
@@ -38,13 +37,14 @@ void conn::start(int mode)
 void conn::sock_reply(bool granted)
 {
     auto self(shared_from_this());
-    //array<unsigned char, 8> msg;
-    //auto data = msg.data();
-    //data[0] = '\0';
-    //data[1] = (granted ? 0x5A : 0x5B);
-    //memcpy(&data[2], (unsigned char*)&(header.D_PORT_CHAR), 2);
-    //memcpy(&data[4], (unsigned char*)&(header.D_IP_CHAR), 4);
-    //cli_sock->async_send(boost::asio::buffer(msg), [](boost::system::error_code ec, size_t _){});
+    array<unsigned char, 8> msg;
+    auto data = msg.data();
+    data[0] = '\0';
+    data[1] = (granted ? 0x5A : 0x5B);
+    memcpy(&data[2], (unsigned char*)&(header.D_PORT_CHAR), 2);
+    memcpy(&data[4], (unsigned char*)&(header.D_IP_CHAR), 4);
+    cli_sock->async_send(boost::asio::buffer(msg), [](boost::system::error_code ec, size_t _){});
+    /*
     string msg;
     msg += '\0';
     msg += (granted ? 0x5A : 0x5B);
@@ -53,32 +53,31 @@ void conn::sock_reply(bool granted)
     for (int i= 0; i< 4; i++)
         msg += header.D_IP_CHAR[i];
     cli_sock->async_send(boost::asio::buffer(msg), [](boost::system::error_code ec, size_t){});
+    */
 }
 
-void conn::sock_commute(bool ser_cli)
+void conn::sock_commute(bool ser_cli, bool cli_cli)
 {
     auto self(shared_from_this());
     if(ser_cli){
-        ser_sock.async_read_some(boost::asio::buffer(data_.data(), data_.size()/ 2), [this, self](boost::system::error_code ec, size_t length){
+        ser_sock.async_read_some(boost::asio::buffer(data_, data_.size()), [this, self](boost::system::error_code ec, size_t length){
             if(!ec){
-                cli_sock->async_send(boost::asio::buffer(data_.data(), length), [this](boost::system::error_code ec, size_t _){
-                    if (!ec) sock_commute(1);
-                });
-                for (int i = 0; i< data_.size()/ 2; i++) data_[i] = '\0';
+                cli_sock->async_send(boost::asio::buffer(data_, MAXLEN), [this, self](boost::system::error_code ec, size_t){});
+                data_.fill('\0');
+                sock_commute(1, 0);
             }
             if(ec == boost::asio::error::eof){
-                cli_sock->close();
+                cli_socket->close();
             }
         });
     }
-    else{
-        cli_sock->async_read_some(boost::asio::buffer(data_.data()+ data_.size()/ 2 + 1, data_.size()- data_.size()/ 2), [this, self](boost::system::error_code ec, size_t length) {
+    else if (cli_cli){
+        cli_sock->async_read_some(boost::asio::buffer(data_, data_.size()), [this, self](boost::system::error_code ec, size_t length) {
             if(!ec){
-                ser_sock.async_send(boost::asio::buffer(data_.data()+ data_.size()/ 2 + 1, length), [this](boost::system::error_code ec, size_t _){
-                if (!ec) sock_commute(0);
-            });
+                ser_sock.async_send(boost::asio::buffer(data_, MAXLEN), [this, self](boost::system::error_code ec, size_t){});
+                data_.fill('\0');
+                sock_commute(0, 1);
             }
-            for (int i = data_.size()/ 2+ 1; i< data_.size(); i++) data_[i] = '\0';
         });
     }
 }
@@ -90,8 +89,7 @@ void conn::do_connect()
     ser_sock.async_connect(ep, [this, self](const boost::system::error_code &ec){
         if(!ec){
             sock_reply(true);
-            sock_commute(1);
-            sock_commute(0);
+            sock_commute(1, 1);
         }
     });
 }
@@ -109,8 +107,7 @@ void conn::do_accept()
     sock_reply(true);
     acceptor_.accept(ser_sock);
     sock_reply(true);
-    sock_commute(1);
-    sock_commute(0);
+    sock_commute(1, 1);
 }
 
 bool single_conn::firewall()

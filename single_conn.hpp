@@ -5,6 +5,7 @@
 #include <boost/asio.hpp>
 #include <map>
 #include <string>
+#define MAXLEN 20000
 using namespace std;
 using boost::asio::ip::tcp;
 
@@ -24,7 +25,7 @@ class single_conn
 private:
     tcp::socket socket_;
     tcp::socket rsock;
-    enum { max_length = 40000 };
+    enum { max_length = MAXLEN };
     array<uint8_t, max_length> data_;
     sock4 header;
     bool fourA;
@@ -44,7 +45,7 @@ private:
     shared_ptr<tcp::socket> cli_sock;
     tcp::socket ser_sock;
     sock4 header;
-    enum { max_length = 40000 };
+    enum { max_length = MAXLEN };
     array<unsigned char, max_length> data_;
 
     void sock_reply(bool granted);
