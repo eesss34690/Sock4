@@ -78,25 +78,30 @@ void client::start()
 void client::sock_conn()
 {
     auto self(shared_from_this());
-    string msg;
-    msg += 0x04;
-    msg += 0x01;
-    int port = stoi(port_);
-    boost::asio::ip::tcp::resolver::query q(host_, port_);
-    msg += port/256;
-    msg += port%256;
-    resolver.async_resolve(q, [this, self, &msg](const boost::system::error_code &ec, tcp::resolver::iterator it)mutable{
-        tcp::endpoint ep = *it;
-        string ips = ep.address().to_string();
+    tcp::resolver::query q(host_, port_);
+
+    resolver.async_resolve(q, [this, self](const boost::system::error_code &ec, tcp::resolver::iterator it)mutable{
+        if (ec) output_shell(session, ec.message());
+        else{
+        string ips = (it->endpoint()).address().to_string();
         int pos = 0, pos2 = 0;
+        string msg;
+        msg += 0x04;
+        msg += 0x01;
+        int port = stoi(port_);
+        msg += port/256;
+        msg += port%256;
+    
         for(int i=4; i<8; i++){
-            int pos2 = ips.find(".");
+            int pos2 = ips.find(".", pos);
             msg += stoi(ips.substr(pos, pos2));
             pos = pos2 + 1;
         }
         msg += '\0';
-        socket.async_send(boost::asio::buffer(msg), [](boost::system::error_code ec, size_t _){});
+        socket.async_send(boost::asio::buffer(msg), [this](boost::system::error_code ec, size_t _){if (ec) output_shell(session, ec.message());});
+        }
     });
+    
 }
 
 void client::do_read()
@@ -153,6 +158,8 @@ void cgi_parser::parser()
         if (end - mid == 1)
         {
             num = query_big.size() / 3;
+            start = env.find('s', start);
+            end = env.find('&', start);
             break;
         }
         query_big[env.substr(start, mid - start)] = env.substr(mid + 1, end - mid - 1);
@@ -162,10 +169,10 @@ void cgi_parser::parser()
     mid = env.find('=', start);
     query_big[env.substr(start, mid - start)] = env.substr(mid + 1, end - mid - 1);
     start = end + 1;
-    end = env.find('&', start);
+    end = env.length() - 1;
     
     mid = env.find('=', start);
-    query_big[env.substr(start, mid - start)] = env.substr(mid + 1, end - mid - 1);
+    query_big[env.substr(start, mid - start)] = env.substr(mid + 1, end - mid);
 }
 
 int main ()
