@@ -44,7 +44,9 @@ void conn::sock_reply(bool granted)
     data[1] = (granted ? 0x5A : 0x5B);
     memcpy(&data[2], (unsigned char*)&(header.D_PORT_CHAR), 2);
     memcpy(&data[4], (unsigned char*)&(header.D_IP_CHAR), 4);
+    cout << "sock reply: ";
     for (auto &j: msg) cout << j - '\0' << " ";
+    cout << endl;
     cli_sock->async_send(boost::asio::buffer(msg), [](boost::system::error_code ec, size_t _){});
 }
 
@@ -54,28 +56,43 @@ void conn::sock_commute(bool ser_cli)
     if(ser_cli){
         ser_sock.async_read_some(boost::asio::buffer(data_.data(), data_.size()/ 2), [this, self](boost::system::error_code ec, size_t length){
             if(!ec){
-                cli_sock->async_send(boost::asio::buffer(data_.data(), length), [](boost::system::error_code ec, size_t _){});
-                data_.fill('\0');
-                sock_commute(1);
+                cli_sock->async_send(boost::asio::buffer(data_.data(), length), [this](boost::system::error_code ec, size_t _){
+                    if (!ec) sock_commute(1);
+                    else cout << "ser ->cli in" << ec.message() << endl;
+                });
+                //data_.fill('\0');
+                //sock_commute(1);
             }
+            else cout << "ser->cli out" << ec.message() << endl;
             if(ec == boost::asio::error::eof){
-                cli_sock->close();
+                if (cli_sock != nullptr) cli_sock->close();
+                //cout << cli_sock.use_count() << endl;
+                if (cli_sock == nullptr) ser_sock.close();
             }
         });
     }
     else{
         cli_sock->async_read_some(boost::asio::buffer(data_.data()+ data_.size()/ 2 + 1, data_.size()- data_.size()/ 2), [this, self](boost::system::error_code ec, size_t length) {
             if(!ec){
-                ser_sock.async_send(boost::asio::buffer(data_.data()+ data_.size()/ 2 + 1, length), [](boost::system::error_code ec, size_t _){});
-                data_.fill('\0');
-                sock_commute(0);
-            }   
+                ser_sock.async_send(boost::asio::buffer(data_.data()+ data_.size()/ 2 + 1, length), [this](boost::system::error_code ec, size_t _){
+                if (!ec) sock_commute(0);
+                else cout << "cli->ser in" << ec.message() << endl;
+            });
+               //data_.fill('\0');
+                //sock_commute(0);
+            }
+            else {cout << "cli->ser out" << ec.message() << endl;
+	        if (cli_sock != nullptr) cli_sock->close();
+                if (cli_sock == nullptr) ser_sock.close();
+            }
+            //else {ser_sock.close();}  
         });
     }
 }
 
 void conn::do_connect()
 {
+    cout << "connect\n";
     auto self(shared_from_this());
     tcp::endpoint ep(boost::asio::ip::address::from_string(header.D_IP), stoi(header.D_PORT));
     ser_sock.async_connect(ep, [this, self](const boost::system::error_code &ec){
@@ -89,6 +106,7 @@ void conn::do_connect()
 
 void conn::do_accept()
 {
+    cout << "bind\n";
     auto self(shared_from_this());
     tcp::acceptor acceptor_(io_context, tcp::endpoint(tcp::v4(), 0));
     unsigned int port_ = acceptor_.local_endpoint().port();
@@ -213,10 +231,11 @@ void single_conn::do_read()
                 cout << "<D_IP>: " << header.D_IP << endl;
                 cout << "<D_PORT>: " << header.D_PORT << endl;
                 cout << "<Command>: ";
-                if(header.CD == 1)
+                if(header.CD == 0x01)
                     cout << "CONNECT" << endl;
-                else if(header.CD == 2)
+                else if(header.CD == 0x02)
                     cout << "BIND" << endl;
+                //cout << header.CD - '\0' << endl;
                 if (firewall())
                 {
                     cout << "<Reply> Accept" << endl << endl;
@@ -229,6 +248,8 @@ void single_conn::do_read()
                 }
                 do_read();
             }
+            //else cout << "read " << ec.message() << endl;
+            else socket_.close();
         });
 }
 
