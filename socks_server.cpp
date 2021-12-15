@@ -27,7 +27,7 @@ void sock_conn::start(int mode){
     data_.fill('\0');
     if(mode == 1)
         do_connect();
-    else if(op == 2)
+    else if(mode == 2)
         do_bind();
     else
         reply_(req, false);
