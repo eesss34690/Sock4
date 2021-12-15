@@ -39,6 +39,24 @@ public:
     void start() { do_read(); };
 };
 
+class sock_conn : public enable_shared_from_this<sock_conn>{
+private:
+    shared_ptr<tcp::socket> cli_sock;
+    tcp::socket ser_sock;
+    sock4 req;
+    array<char, MAXLEN> data_;
+    void reply_(sock4 req, bool ok);
+    void sock_commute(bool ser, bool cli);
+    void do_connect();
+    void do_bind();
+public:
+    sock_conn(tcp::socket sock, sock4 sock_):
+            cli_sock(make_shared<tcp::socket>(move(sock))),
+            ser_sock(io_context),
+            req(sock_){}
+    void start(int op);
+};
+
 class conn
  : public enable_shared_from_this<conn> {
 private:
@@ -49,7 +67,7 @@ private:
     array<unsigned char, max_length> data_;
 
     void sock_reply(bool granted);
-    void sock_commute(bool ser_cli);
+    void sock_commute(bool ser_cli, bool cli_cli);
     void do_connect();
     void do_accept();
 public:

@@ -22,6 +22,13 @@ socks_server: socks_server.cpp
 console.cgi: console.cpp
 	$(CXX) -o $@ $^ $(CXX_INCLUDE_PARAMS) $(CXX_LIB_PARAMS) $(CXXFLAGS)
 
+shift: 
+	mv console.cgi ~/public_html/
+	./socks_server 8886 > socks.txt 2>&1 &
+	echo $! > socks.pid
+	~/NetProg/np_single_golden 12345 &
+	echo $! > golden.pid
+
 precompile: ./cmds/noop.cpp ./cmds/number.cpp ./cmds/removetag.cpp ./cmds/removetag0.cpp ./cmds/delayedremovetag.cpp
 	cp ${SRC}/ls ./bin
 	cp ${SRC}/cat ./bin

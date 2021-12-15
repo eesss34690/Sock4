@@ -1,4 +1,5 @@
 *.txt
+*.pid
 socks_server
 bin/
 .git
@@ -8,6 +9,5 @@ __MACOSX
 .vscode
 .nfs*
 np_single_golden
-panel.cgi
 test.html
 panel_socks.cgi
