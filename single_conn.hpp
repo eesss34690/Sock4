@@ -25,8 +25,7 @@ class single_conn
 private:
     tcp::socket socket_;
     tcp::socket rsock;
-    enum { max_length = MAXLEN };
-    array<uint8_t, max_length> data_;
+    array<uint8_t, MAXLEN> data_;
     sock4 header;
     bool fourA;
     void do_read();
@@ -53,28 +52,8 @@ public:
     sock_conn(tcp::socket sock, sock4 sock_):
             cli_sock(make_shared<tcp::socket>(move(sock))),
             ser_sock(io_context),
-            req(sock_){}
-    void start(int op);
-};
-
-class conn
- : public enable_shared_from_this<conn> {
-private:
-    shared_ptr<tcp::socket> cli_sock;
-    tcp::socket ser_sock;
-    sock4 header;
-    enum { max_length = MAXLEN };
-    array<unsigned char, max_length> data_;
-
-    void sock_reply(bool granted);
-    void sock_commute(bool ser_cli, bool cli_cli);
-    void do_connect();
-    void do_accept();
-public:
-    conn(tcp::socket sock, sock4 req):
-        cli_sock(make_shared<tcp::socket>(move(sock))),
-        ser_sock(io_context),
-        header(req){};
+            req(sock_){};
     void start(int mode);
 };
+
 #endif
